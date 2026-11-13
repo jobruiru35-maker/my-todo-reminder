@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>My Daily Tasks</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#172554}
+header{background:#172554;color:white;padding:28px 20px;border-radius:0 0 24px 24px}
+header h1{margin:0 0 8px;font-size:25px}
+header p{margin:0;color:#cbd5e1}
+main{max-width:600px;margin:auto;padding:18px}
+.card{background:white;padding:18px;border-radius:16px;margin-bottom:16px;box-shadow:0 3px 12px #0000000b}
+h2{font-size:18px;margin-top:0}
+input,button{font-size:16px;padding:13px;border-radius:10px}
+input{border:1px solid #cbd5e1;width:100%;margin-bottom:10px}
+button{border:0;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
+.add{width:100%}
+.task{display:flex;align-items:center;gap:10px;padding:13px 0;border-bottom:1px solid #e2e8f0}
+.task:last-child{border:0}
+.task input{width:20px;height:20px;margin:0}
+.task span{flex:1;overflow-wrap:anywhere}
+.done span{text-decoration:line-through;color:#94a3b8}
+.delete{background:#fee2e2;color:#b91c1c;padding:8px 12px}
+small{color:#64748b}
+.stats{display:flex;justify-content:space-between;color:#475569}
+#empty{text-align:center;color:#94a3b8;padding:20px}
+.remind{width:100%;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+<h1>My Daily Tasks 📋</h1>
+<p>Stay organised. Get things done.</p>
+</header>
+
+<main>
+<div class="card">
+<h2>➕ Add a task</h2>
+<input id="taskInput" placeholder="What do you need to do?">
+<button class="add" onclick="addTask()">Add Task</button>
+</div>
+
+<div class="card">
+<h2>My task list</h2>
+<div class="stats">
+<span id="total">0 tasks</span>
+<span id="progress">0 completed</span>
+</div>
+<div id="tasks"></div>
+<div id="empty">No tasks yet. Add your first task!</div>
+</div>
+
+<div class="card">
+<h2>🔔 Daily reminders</h2>
+<p>Choose when to be reminded about unfinished tasks.</p>
+<input type="time" id="reminderTime" value="09:00">
+<button class="remind" onclick="enableReminders()">
+Enable notifications
+</button>
+<p><small id="status">Notifications are not enabled yet.</small></p>
+<small>Keep the app open for reminders in this first version.</small>
+</div>
+</main>
+
+<script>
+let tasks = JSON.parse(localStorage.getItem("myTasks") || "[]");
+
+function save(){
+ localStorage.setItem("myTasks",JSON.stringify(tasks));
+ render();
+}
+
+function addTask(){
+ const input=document.getElementById("taskInput");
+ const value=input.value.trim();
+ if(!value)return;
+ tasks.push({
+  id:Date.now(),
+  text:value,
+  done:false
+ });
+ input.value="";
+ save();
+}
+
+document.getElementById("taskInput").addEventListener("keydown",e=>{
+ if(e.key==="Enter")addTask();
+});
+
+function toggleTask(id){
+ tasks=tasks.map(t=>t.id===id?{...t,done:!t.done}:t);
+ save();
+}
+
+function deleteTask(id){
+ tasks=tasks.filter(t=>t.id!==id);
+ save();
+}
+
+function render(){
+ const list=document.getElementById("tasks");
+ list.innerHTML="";
+ tasks.forEach(t=>{
+  const div=document.createElement("div");
+  div.className="task"+(t.done?" done":"");
+  const check=document.createElement("input");
+  check.type="checkbox";
+  check.checked=t.done;
+  check.onchange=()=>toggleTask(t.id);
+  const span=document.createElement("span");
+  span.textContent=t.text;
+  const del=document.createElement("button");
+  del.textContent="Delete";
+  del.className="delete";
+  del.onclick=()=>deleteTask(t.id);
+  div.append(check,span,del);
+  list.appendChild(div);
+ });
+ document.getElementById("empty").style.display=tasks.length?"none":"block";
+ document.getElementById("total").textContent=tasks.length+" tasks";
+ document.getElementById("progress").textContent=tasks.filter(t=>t.done).length+" completed";
+}
+
+function enableReminders(){
+ if(!("Notification" in window)){
+  document.getElementById("status").textContent="Notifications are not supported by this browser.";
+  return;
+ }
+ Notification.requestPermission().then(permission=>{
+  document.getElementById("status").textContent=
+   permission==="granted"?"Notifications enabled!":"Notification permission was not granted.";
+  localStorage.setItem("reminderTime",document.getElementById("reminderTime").value);
+  checkReminder();
+ });
+}
+
+const timeInput=document.getElementById("reminderTime");
+timeInput.value=localStorage.getItem("reminderTime")||"09:00";
+timeInput.addEventListener("change",()=>{
+ localStorage.setItem("reminderTime",timeInput.value);
+});
+
+function checkReminder(){
+ if(!("Notification" in window)||Notification.permission!=="granted")return;
+ const now=new Date();
+ const current=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+ const today=now.getFullYear()+"-"+now.getMonth()+"-"+now.getDate();
+ const last=localStorage.getItem("lastReminder");
+ const unfinished=tasks.filter(t=>!t.done);
+ if(current>=timeInput.value && last!==today && unfinished.length>0){
+  new Notification("My Daily Tasks",{
+   body:"You still have "+unfinished.length+" unfinished task(s). Open your list and complete them!"
+  });
+  localStorage.setItem("lastReminder",today);
+ }
+}
+
+render();
+checkReminder();
+setInterval(checkReminder,60000);
+</script>
+</body>
+</html>
